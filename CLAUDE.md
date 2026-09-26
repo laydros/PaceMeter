@@ -1,0 +1,24 @@
+# CLAUDE.md
+
+PaceMeter is a WinForms (.NET 9) tray app that shows Claude plan usage limits and pace. See README.md for features and the pace formula.
+
+## Commands
+
+```bash
+dotnet build
+dotnet test
+dotnet publish src/PaceMeter -c Release -r win-x64   # single-file exe
+```
+
+## Architecture
+
+- `UsageClient` reads the OAuth token from Claude Code's `.credentials.json` (honors `CLAUDE_CONFIG_DIR`) on every fetch and calls `GET https://api.anthropic.com/api/oauth/usage` with header `anthropic-beta: oauth-2025-04-20`. It only uses the response's `limits` array; `group` maps to window length (`session` = 5h, `weekly` = 7d).
+- The token is read-only here. Never refresh or rewrite it: Claude Code owns the refresh token, and rotating it would sign Claude Code out.
+- `Pace.Compute` is pure and unit-tested. Keep the UI free of math so it stays testable.
+- `PopupForm` is fully owner-drawn. Pixel constants are at 96 DPI and scaled with `S()`; `MeasureHeight` and `OnPaint` must agree on the layout.
+- `TrayContext` owns the refresh timer (5 min) and the HKCU `Run` key for "Start with Windows".
+
+## Conventions
+
+- No third-party runtime dependencies. This keeps licensing simple and the published exe small.
+- Tests live in `tests/PaceMeter.Tests` (xUnit). Internals are visible to that assembly.
