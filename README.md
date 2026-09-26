@@ -13,6 +13,12 @@ A small Windows tray app that shows your Claude plan usage limits and whether yo
 
 Data refreshes every 5 minutes, and again when you open the popup if the data is more than a minute old.
 
+## Install
+
+Download `PaceMeter.exe` from the [latest release](https://github.com/laydros/PaceMeter/releases/latest) and run it. It's a single self-contained exe, so there's no installer and no .NET install needed. Right-click the tray icon and choose **Start with Windows** to launch it at login.
+
+The exe isn't code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Click **More info**, then **Run anyway**. If you'd rather not trust a prebuilt binary, build it yourself (see below).
+
 ## Requirements
 
 - Windows 10/11
