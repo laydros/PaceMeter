@@ -70,6 +70,7 @@ src/PaceMeter/
   Pace.cs               pace/projection math
   Theme.cs              colors
 tests/PaceMeter.Tests/  xUnit tests for pace math and response parsing
+tools/New-AppIcon.ps1   regenerates src/PaceMeter/PaceMeter.ico (the exe icon)
 ```
 
 ## License

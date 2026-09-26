@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>PaceMeter.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <Product>PaceMeter</Product>
     <Description>Windows tray app showing Claude plan usage and pace.</Description>
