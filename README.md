@@ -2,11 +2,11 @@
 
 A small Windows tray app that shows your Claude plan usage limits and whether you're on pace to make them last. Inspired by [CodexBar](https://github.com/steipete/CodexBar) for macOS.
 
-- **Tray icon:** two mini meters. The top one is the 5-hour session window and the bottom one is the weekly window. Green, amber, and red mark 75% and 90% used.
-- **Hover:** a tooltip with the session and weekly percentages.
+- **Tray icon:** two mini meters showing what's left. The top one is the 5-hour session window and the bottom one is the weekly window. They drain as you use them and turn amber at 25% left and red at 10% left.
+- **Hover:** a tooltip with the session and weekly percentages left.
 - **Left-click:** a popup with every limit your plan reports (session, weekly, and per-model weekly limits such as Fable), each with:
-  - percent used and time until reset
-  - a white pace tick on the bar showing where an even burn rate would put you right now
+  - percent left and time until reset
+  - a white pace tick on the bar showing where an even burn rate would leave you right now
   - **% in reserve / % in deficit**: how far under or over that even pace you are
   - a projection at your average rate so far: "lasts until reset" or "runs out in Xh (Yh early)"
 - **Right-click:** Refresh, Start with Windows, Quit.

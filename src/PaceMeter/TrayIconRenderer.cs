@@ -54,8 +54,9 @@ internal static class TrayIconRenderer
             return;
         }
 
+        // Fill shows what's left, so the meter drains as usage grows.
         if (percent is not double p) return;
-        var fillW = (int)Math.Round(r.Width * Math.Clamp(p, 0, 100) / 100.0);
+        var fillW = (int)Math.Round(r.Width * (100 - Math.Clamp(p, 0, 100)) / 100.0);
         if (fillW <= 0) return;
         using var fill = new SolidBrush(Theme.ForPercent(p));
         g.FillRectangle(fill, r with { Width = fillW });

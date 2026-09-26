@@ -180,23 +180,25 @@ internal sealed class PopupForm : Form
         var right = left + inner;
 
         TextRenderer.DrawText(g, limit.Label, _labelFont, new Point(left, y), Theme.Text);
-        DrawRight(g, $"{limit.Percent:0}% used", _labelFont, right, y, Theme.ForPercent(limit.Percent));
+        var remaining = 100 - Math.Clamp(limit.Percent, 0, 100);
+        DrawRight(g, $"{remaining:0}% left", _labelFont, right, y, Theme.ForPercent(limit.Percent));
         y += S(22);
 
         PaceResult? pace = limit is { ResetsAt: { } r, Window: { } w }
             ? Pace.Compute(limit.Percent, r, w, now)
             : null;
 
+        // The bar shows what's left, draining from the right as usage grows.
         var bar = new Rectangle(left, y, inner, S(8));
         using (var track = new SolidBrush(Theme.Track)) g.FillRectangle(track, bar);
-        var fillW = (int)Math.Round(bar.Width * Math.Clamp(limit.Percent, 0, 100) / 100.0);
+        var fillW = (int)Math.Round(bar.Width * remaining / 100.0);
         if (fillW > 0)
             using (var fill = new SolidBrush(Theme.ForPercent(limit.Percent)))
                 g.FillRectangle(fill, bar with { Width = fillW });
         if (pace is not null)
         {
-            // Tick where an even pace would put usage right now.
-            var mx = bar.Left + (int)Math.Round(bar.Width * Math.Clamp(pace.ExpectedPercent, 0, 100) / 100.0);
+            // Tick where an even pace would put the remaining amount right now.
+            var mx = bar.Left + (int)Math.Round(bar.Width * (100 - Math.Clamp(pace.ExpectedPercent, 0, 100)) / 100.0);
             using var marker = new SolidBrush(Theme.PaceMarker);
             g.FillRectangle(marker, mx - S(1), bar.Top - S(3), Math.Max(2, S(2)), bar.Height + S(6));
         }

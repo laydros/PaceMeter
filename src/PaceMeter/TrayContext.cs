@@ -117,8 +117,8 @@ internal sealed class TrayContext : ApplicationContext
             return _error is null ? "PaceMeter - loading" : Truncate($"PaceMeter - {_error}");
 
         var parts = new List<string>();
-        if (session is not null) parts.Add($"Session {session.Percent:0}%");
-        if (weekly is not null) parts.Add($"Weekly {weekly.Percent:0}%");
+        if (session is not null) parts.Add($"Session {100 - Math.Clamp(session.Percent, 0, 100):0}% left");
+        if (weekly is not null) parts.Add($"Weekly {100 - Math.Clamp(weekly.Percent, 0, 100):0}% left");
         var text = parts.Count > 0 ? string.Join(" | ", parts) : "PaceMeter";
         if (_error is not null) text += " (stale)";
         return Truncate(text);
