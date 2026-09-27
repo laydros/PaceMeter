@@ -8,7 +8,20 @@ PaceMeter is a WinForms (.NET 9) tray app that shows Claude plan usage limits an
 dotnet build
 dotnet test
 dotnet publish src/PaceMeter -c Release -r win-x64   # single-file exe
+pwsh -NoProfile -File tools/Build-Release.ps1        # test + publish + installer -> artifacts/
 ```
+
+## Releasing
+
+1. Bump `<Version>` in `src/PaceMeter/PaceMeter.csproj` and commit. Commit before building, so the exe's embedded commit hash matches the tag.
+2. Run `tools/Build-Release.ps1` (needs Inno Setup 6).
+3. Tag `vX.Y.Z`, push, then `gh release create` with both `artifacts/PaceMeter-Setup-X.Y.Z.exe` and the published `PaceMeter.exe`.
+
+## Installer
+
+- `installer/PaceMeter.iss` is a per-user install (`PrivilegesRequired=lowest`) into `%LOCALAPPDATA%\Programs\PaceMeter`. Never change its `AppId`; upgrades and uninstall depend on it.
+- The "startup" task writes the same HKCU `Run` value as the app's menu toggle. Uninstall always removes that value, even if the app's menu set it.
+- Setup and uninstall stop a running PaceMeter with `taskkill`, because Restart Manager can't close a windowless tray app.
 
 ## Architecture
 

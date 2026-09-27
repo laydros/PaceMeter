@@ -15,9 +15,12 @@ Data refreshes every 5 minutes, and again when you open the popup if the data is
 
 ## Install
 
-Download `PaceMeter.exe` from the [latest release](https://github.com/laydros/PaceMeter/releases/latest) and run it. It's a single self-contained exe, so there's no installer and no .NET install needed. Right-click the tray icon and choose **Start with Windows** to launch it at login.
+Download from the [latest release](https://github.com/laydros/PaceMeter/releases/latest). No admin rights or .NET install needed.
 
-The exe isn't code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Click **More info**, then **Run anyway**. If you'd rather not trust a prebuilt binary, build it yourself (see below).
+- **`PaceMeter-Setup-<version>.exe` (recommended):** installs for your user only, into `%LOCALAPPDATA%\Programs\PaceMeter`. It adds a Start menu shortcut, offers to start PaceMeter at sign-in (checked by default), and registers an uninstaller under Settings > Apps. To upgrade, run a newer installer; it closes the running PaceMeter first.
+- **`PaceMeter.exe` (portable):** a single self-contained exe. Put it anywhere and run it. Right-click the tray icon and choose **Start with Windows** to launch it at sign-in.
+
+Neither file is code-signed, so on first run Windows SmartScreen may show "Windows protected your PC". Click **More info**, then **Run anyway**. If you'd rather not trust a prebuilt binary, build it yourself (see below).
 
 ## Requirements
 
@@ -47,6 +50,14 @@ dotnet publish src/PaceMeter -c Release -r win-x64
 
 The output is `src/PaceMeter/bin/Release/net9.0-windows/win-x64/publish/PaceMeter.exe`.
 
+The installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`). This script runs the tests, publishes the exe, and builds `artifacts/PaceMeter-Setup-<version>.exe`:
+
+```bash
+pwsh -NoProfile -File tools/Build-Release.ps1
+```
+
+The installer version comes from `<Version>` in `src/PaceMeter/PaceMeter.csproj`.
+
 ## How pace is calculated
 
 For a window of length `W` (5 hours or 7 days) that resets at `R`:
@@ -71,6 +82,8 @@ src/PaceMeter/
   Theme.cs              colors
 tests/PaceMeter.Tests/  xUnit tests for pace math and response parsing
 tools/New-AppIcon.ps1   regenerates src/PaceMeter/PaceMeter.ico (the exe icon)
+tools/Build-Release.ps1 test + publish + build installer
+installer/PaceMeter.iss Inno Setup script (per-user install)
 ```
 
 ## License
