@@ -20,7 +20,7 @@ internal sealed class PopupForm : Form
     readonly Font _textFont = new("Segoe UI", 9f);
 
     UsageSnapshot? _snapshot;
-    string? _error;
+    UsageException? _error;
     bool _loading;
     Rectangle _refreshLink, _quitLink;
 
@@ -57,7 +57,7 @@ internal sealed class PopupForm : Form
     float Scale1 => DeviceDpi / 96f;
     int S(int v) => (int)Math.Round(v * Scale1);
 
-    public void SetState(UsageSnapshot? snapshot, string? error, bool loading)
+    public void SetState(UsageSnapshot? snapshot, UsageException? error, bool loading)
     {
         _snapshot = snapshot;
         _error = error;
@@ -124,8 +124,27 @@ internal sealed class PopupForm : Form
         Cursor = _refreshLink.Contains(e.Location) || _quitLink.Contains(e.Location) ? Cursors.Hand : Cursors.Default;
     }
 
+    /// <summary>The notice shown above the rows when the last fetch failed, or null.</summary>
+    string? ErrorText
+    {
+        get
+        {
+            if (_error is null) return null;
+            if (!_error.TokenExpired) return _error.Message;
+
+            var when = _error.ExpiredAt is { } at ? $" at {TimeFormat.When(at, DateTimeOffset.Now)}" : "";
+            var resume = _snapshot is null
+                ? "Updates resume the next time you use Claude Code."
+                : "Showing the last reading; updates resume the next time you use Claude Code.";
+            return $"Claude Code's sign-in token expired{when}. {resume}";
+        }
+    }
+
+    // Expiry is routine (Claude Code refreshes on its next run), so it isn't shown as an error.
+    Color ErrorColor => _error is { TokenExpired: true } ? Theme.Warn : Theme.Bad;
+
     int ErrorHeight(int width) =>
-        _error is null ? 0 : TextRenderer.MeasureText(_error, _textFont, new Size(width, int.MaxValue), TextFormatFlags.WordBreak).Height + S(10);
+        ErrorText is not { } text ? 0 : TextRenderer.MeasureText(text, _textFont, new Size(width, int.MaxValue), TextFormatFlags.WordBreak).Height + S(10);
 
     int RowCount => _snapshot?.Limits.Count ?? 0;
 
@@ -150,10 +169,10 @@ internal sealed class PopupForm : Form
         TextRenderer.DrawText(g, "Claude usage", _titleFont, new Point(left, y), Theme.Text);
         y += S(HeaderH);
 
-        if (_error is not null)
+        if (ErrorText is { } errorText)
         {
             var h = ErrorHeight(inner) - S(10);
-            TextRenderer.DrawText(g, _error, _textFont, new Rectangle(left, y, inner, h), Theme.Bad, TextFormatFlags.WordBreak);
+            TextRenderer.DrawText(g, errorText, _textFont, new Rectangle(left, y, inner, h), ErrorColor, TextFormatFlags.WordBreak);
             y += h + S(10);
         }
 
@@ -180,6 +199,19 @@ internal sealed class PopupForm : Form
         var right = left + inner;
 
         TextRenderer.DrawText(g, limit.Label, _labelFont, new Point(left, y), Theme.Text);
+
+        // A stale reading can outlive its window. The old percentage no longer applies,
+        // and there is no newer data to show.
+        if (limit.ResetsAt is { } resetAt && resetAt <= now)
+        {
+            DrawRight(g, "Reset", _labelFont, right, y, Theme.TextMuted);
+            y += S(22);
+            using (var track = new SolidBrush(Theme.Track)) g.FillRectangle(track, left, y, inner, S(8));
+            y += S(16);
+            TextRenderer.DrawText(g, $"Window reset {TimeFormat.When(resetAt, now)}, no data since", _textFont, new Point(left, y), Theme.TextMuted);
+            return;
+        }
+
         var remaining = 100 - Math.Clamp(limit.Percent, 0, 100);
         DrawRight(g, $"{remaining:0}% left", _labelFont, right, y, Theme.ForPercent(limit.Percent));
         y += S(22);
@@ -234,10 +266,11 @@ internal sealed class PopupForm : Form
     void DrawFooter(Graphics g, int left, int right, int y)
     {
         y += S(4);
+        var stale = _error is not null && _snapshot is not null;
         var status = _loading ? "Refreshing..."
-            : _snapshot is { } s ? $"Updated {s.FetchedAt.LocalDateTime:t}"
+            : _snapshot is { } s ? $"{(stale ? "Last updated" : "Updated")} {TimeFormat.When(s.FetchedAt, DateTimeOffset.Now)}"
             : "";
-        TextRenderer.DrawText(g, status, _textFont, new Point(left, y), Theme.TextMuted);
+        TextRenderer.DrawText(g, status, _textFont, new Point(left, y), stale && !_loading ? Theme.Warn : Theme.TextMuted);
 
         var quitSize = TextRenderer.MeasureText("Quit", _textFont);
         _quitLink = new Rectangle(right - quitSize.Width, y, quitSize.Width, quitSize.Height);

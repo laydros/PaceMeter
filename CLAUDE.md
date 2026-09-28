@@ -27,6 +27,8 @@ pwsh -NoProfile -File tools/Build-Release.ps1        # test + publish + installe
 
 - `UsageClient` reads the OAuth token from Claude Code's `.credentials.json` (honors `CLAUDE_CONFIG_DIR`) on every fetch and calls `GET https://api.anthropic.com/api/oauth/usage` with header `anthropic-beta: oauth-2025-04-20`. It only uses the response's `limits` array; `group` maps to window length (`session` = 5h, `weekly` = 7d).
 - The token is read-only here. Never refresh or rewrite it: Claude Code owns the refresh token, and rotating it would sign Claude Code out.
+- The access token lasts about 8 hours, so it expiring overnight is normal. `UsageException.TokenExpired` marks that case, and the UI shows it as a calm amber notice, not an error.
+- `SnapshotStore` saves each successful reading to `%LOCALAPPDATA%\PaceMeter\last-usage.json`, and `TrayContext` loads it at startup. When a fetch fails, the saved reading is shown as stale: gray tray meters, a "Last updated" footer, and "Reset" for any window whose `ResetsAt` has passed.
 - `Pace.Compute` is pure and unit-tested. Keep the UI free of math so it stays testable.
 - `PopupForm` is fully owner-drawn. Pixel constants are at 96 DPI and scaled with `S()`; `MeasureHeight` and `OnPaint` must agree on the layout.
 - `TrayContext` owns the refresh timer (5 min) and the HKCU `Run` key for "Start with Windows".

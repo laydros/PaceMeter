@@ -27,7 +27,9 @@ Neither file is code-signed, so on first run Windows SmartScreen may show "Windo
 - Windows 10/11
 - [Claude Code](https://claude.com/claude-code), signed in with a Claude subscription (Pro/Max). PaceMeter reads the OAuth token Claude Code stores in `%USERPROFILE%\.claude\.credentials.json`, or in `%CLAUDE_CONFIG_DIR%\.credentials.json` if that variable is set.
 
-PaceMeter never refreshes or writes the token. If it expires, run Claude Code once and PaceMeter picks up the new token on its next refresh.
+PaceMeter never refreshes or writes the token. The token lasts about 8 hours, and Claude Code (terminal or desktop app) refreshes it whenever you use it. So after a long break, such as overnight, it may have expired. When that happens, PaceMeter keeps showing the last reading it saved (in `%LOCALAPPDATA%\PaceMeter\last-usage.json`) with gray tray meters and a "Last updated" time. Any window that has reset since then shows as "Reset". Updates resume automatically the next time you use Claude Code.
+
+A stale reading can miss usage from the Claude apps (chat counts toward the same limits), so treat it as a lower bound.
 
 ## Caveat
 
@@ -78,6 +80,8 @@ src/PaceMeter/
   PopupForm.cs          owner-drawn popup
   TrayIconRenderer.cs   draws the two-bar tray icon
   UsageClient.cs        reads credentials, calls the usage endpoint, parses limits
+  SnapshotStore.cs      saves/loads the last good reading for stale display
+  TimeFormat.cs         "3:48 AM" / "Sat 3:48 AM" formatting
   Pace.cs               pace/projection math
   Theme.cs              colors
 tests/PaceMeter.Tests/  xUnit tests for pace math and response parsing

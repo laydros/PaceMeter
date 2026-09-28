@@ -14,11 +14,12 @@ internal sealed class TrayContext : ApplicationContext
     readonly NotifyIcon _tray;
     readonly PopupForm _popup = new();
     readonly UsageClient _client = new();
+    readonly SnapshotStore _store = new();
     readonly System.Windows.Forms.Timer _timer = new();
     readonly ToolStripMenuItem _startupItem;
 
     UsageSnapshot? _snapshot;
-    string? _error;
+    UsageException? _error;
     bool _loading;
     Icon? _icon;
 
@@ -46,6 +47,8 @@ internal sealed class TrayContext : ApplicationContext
         _popup.RefreshRequested += async (_, _) => await RefreshAsync();
         _popup.QuitRequested += (_, _) => ExitThread();
 
+        // Show the last saved reading until the first fetch completes (or instead of it, if that fails).
+        _snapshot = _store.Load();
         UpdateIcon();
 
         _timer.Interval = (int)RefreshInterval.TotalMilliseconds;
@@ -80,14 +83,15 @@ internal sealed class TrayContext : ApplicationContext
         {
             _snapshot = await _client.FetchAsync();
             _error = null;
+            _store.Save(_snapshot);
         }
         catch (UsageException ex)
         {
-            _error = ex.Message;
+            _error = ex;
         }
         catch (Exception ex)
         {
-            _error = $"Unexpected error: {ex.Message}";
+            _error = new UsageException($"Unexpected error: {ex.Message}");
         }
         finally
         {
@@ -104,7 +108,10 @@ internal sealed class TrayContext : ApplicationContext
         var weekly = Find("weekly_all");
 
         var old = _icon;
-        _icon = TrayIconRenderer.Render(session?.Percent, weekly?.Percent, error: _error is not null && _snapshot is null);
+        var state = _snapshot is null ? (_error is null ? IconState.Normal : IconState.Error)
+            : _error is null ? IconState.Normal
+            : IconState.Stale;
+        _icon = TrayIconRenderer.Render(CurrentPercent(session), CurrentPercent(weekly), state);
         _tray.Icon = _icon;
         TrayIconRenderer.Release(old);
 
@@ -114,15 +121,22 @@ internal sealed class TrayContext : ApplicationContext
     string TooltipText(LimitView? session, LimitView? weekly)
     {
         if (_snapshot is null)
-            return _error is null ? "PaceMeter - loading" : Truncate($"PaceMeter - {_error}");
+            return _error is null ? "PaceMeter - loading" : Truncate($"PaceMeter - {_error.Message}");
 
         var parts = new List<string>();
-        if (session is not null) parts.Add($"Session {100 - Math.Clamp(session.Percent, 0, 100):0}% left");
-        if (weekly is not null) parts.Add($"Weekly {100 - Math.Clamp(weekly.Percent, 0, 100):0}% left");
+        if (session is not null) parts.Add($"Session {LeftText(session)}");
+        if (weekly is not null) parts.Add($"Weekly {LeftText(weekly)}");
         var text = parts.Count > 0 ? string.Join(" | ", parts) : "PaceMeter";
-        if (_error is not null) text += " (stale)";
+        if (_error is not null) text += $" (as of {TimeFormat.When(_snapshot.FetchedAt, DateTimeOffset.Now)})";
         return Truncate(text);
     }
+
+    static string LeftText(LimitView limit) =>
+        CurrentPercent(limit) is { } p ? $"{100 - Math.Clamp(p, 0, 100):0}% left" : "reset";
+
+    /// <summary>The limit's percent used, or null if its window has reset since the reading was taken.</summary>
+    static double? CurrentPercent(LimitView? limit) =>
+        limit is null || limit.ResetsAt <= DateTimeOffset.Now ? null : limit.Percent;
 
     // NotifyIcon.Text throws above 127 characters.
     static string Truncate(string s) => s.Length <= 127 ? s : s[..124] + "...";

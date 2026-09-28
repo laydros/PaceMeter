@@ -6,6 +6,15 @@ namespace PaceMeter;
 /// <summary>
 /// Draws the tray icon: two stacked meters, session on top and weekly on the bottom.
 /// </summary>
+internal enum IconState
+{
+    Normal,
+    /// <summary>Showing a saved reading because the latest fetch failed; meters are drawn in gray.</summary>
+    Stale,
+    /// <summary>No data at all.</summary>
+    Error,
+}
+
 internal static class TrayIconRenderer
 {
     [DllImport("user32.dll")]
@@ -13,7 +22,7 @@ internal static class TrayIconRenderer
     static extern bool DestroyIcon(IntPtr hIcon);
 
     /// <summary>Returns a new icon. Dispose the previous one with <see cref="Release"/>.</summary>
-    public static Icon Render(double? top, double? bottom, bool error)
+    public static Icon Render(double? top, double? bottom, IconState state)
     {
         var size = SystemInformation.SmallIconSize;
         using var bmp = new Bitmap(size.Width, size.Height);
@@ -26,8 +35,8 @@ internal static class TrayIconRenderer
             int gap = Math.Max(1, h / 8);
             int barH = (h - gap * 3) / 2;
 
-            DrawMeter(g, new Rectangle(0, gap, w, barH), top, error);
-            DrawMeter(g, new Rectangle(0, gap * 2 + barH, w, barH), bottom, error);
+            DrawMeter(g, new Rectangle(0, gap, w, barH), top, state);
+            DrawMeter(g, new Rectangle(0, gap * 2 + barH, w, barH), bottom, state);
         }
 
         var hIcon = bmp.GetHicon();
@@ -42,12 +51,12 @@ internal static class TrayIconRenderer
         DestroyIcon(handle);
     }
 
-    static void DrawMeter(Graphics g, Rectangle r, double? percent, bool error)
+    static void DrawMeter(Graphics g, Rectangle r, double? percent, IconState state)
     {
         using (var track = new SolidBrush(Theme.Track))
             g.FillRectangle(track, r);
 
-        if (error)
+        if (state == IconState.Error)
         {
             using var bad = new SolidBrush(Theme.Bad);
             g.FillRectangle(bad, r with { Width = Math.Max(2, r.Width / 4) });
@@ -58,7 +67,7 @@ internal static class TrayIconRenderer
         if (percent is not double p) return;
         var fillW = (int)Math.Round(r.Width * (100 - Math.Clamp(p, 0, 100)) / 100.0);
         if (fillW <= 0) return;
-        using var fill = new SolidBrush(Theme.ForPercent(p));
+        using var fill = new SolidBrush(state == IconState.Stale ? Theme.TextMuted : Theme.ForPercent(p));
         g.FillRectangle(fill, r with { Width = fillW });
     }
 }

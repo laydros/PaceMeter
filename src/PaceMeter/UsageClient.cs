@@ -10,7 +10,13 @@ internal sealed record LimitView(string Kind, string Label, double Percent, Date
 
 internal sealed record UsageSnapshot(IReadOnlyList<LimitView> Limits, DateTimeOffset FetchedAt);
 
-internal sealed class UsageException(string message) : Exception(message);
+/// <param name="TokenExpired">True when the failure is an expired or rejected OAuth token, which Claude Code fixes on its next run.</param>
+/// <param name="ExpiredAt">When the token expired, if known.</param>
+internal sealed class UsageException(string message, bool tokenExpired = false, DateTimeOffset? expiredAt = null) : Exception(message)
+{
+    public bool TokenExpired { get; } = tokenExpired;
+    public DateTimeOffset? ExpiredAt { get; } = expiredAt;
+}
 
 /// <summary>
 /// Reads the Claude Code OAuth token from disk and queries the usage endpoint.
@@ -60,7 +66,7 @@ internal sealed class UsageClient : IDisposable
         using (resp)
         {
             if (resp.StatusCode == HttpStatusCode.Unauthorized)
-                throw new UsageException("Token rejected. Run Claude Code once to refresh it.");
+                throw new UsageException("Token rejected. Run Claude Code once to refresh it.", tokenExpired: true);
             if (!resp.IsSuccessStatusCode)
                 throw new UsageException($"Usage request failed: HTTP {(int)resp.StatusCode}.");
 
@@ -90,8 +96,8 @@ internal sealed class UsageClient : IDisposable
         if (string.IsNullOrEmpty(oauth?.AccessToken))
             throw new UsageException("Credentials file has no OAuth token. Sign in with Claude Code.");
 
-        if (oauth.ExpiresAt is long ms && DateTimeOffset.FromUnixTimeMilliseconds(ms) <= DateTimeOffset.UtcNow)
-            throw new UsageException("Token expired. Run Claude Code once to refresh it.");
+        if (oauth.ExpiresAt is long ms && DateTimeOffset.FromUnixTimeMilliseconds(ms) is var expiresAt && expiresAt <= DateTimeOffset.UtcNow)
+            throw new UsageException("Token expired. Run Claude Code once to refresh it.", tokenExpired: true, expiredAt: expiresAt);
 
         return oauth.AccessToken;
     }
