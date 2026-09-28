@@ -29,6 +29,10 @@ Neither file is code-signed, so on first run Windows SmartScreen may show "Windo
 
 PaceMeter never refreshes or writes the token. The token lasts about 8 hours, and Claude Code (terminal or desktop app) refreshes it whenever you use it. So after a long break, such as overnight, it may have expired. When that happens, PaceMeter keeps showing the last reading it saved (in `%LOCALAPPDATA%\PaceMeter\last-usage.json`) with gray tray meters and a "Last updated" time. Any window that has reset since then shows as "Reset". Updates resume automatically the next time you use Claude Code.
 
+To renew the token right away, click **Refresh**. When the token has expired, Refresh has Claude Code renew it the normal way. PaceMeter runs `claude --allowed-tools "" --strict-mcp-config --settings '{"remoteControlAtStartup":false}' --session-id <new id> /usage` in the background from `%LOCALAPPDATA%\PaceMeter\probe`. That runs Claude Code's local `/usage` command: no prompt is sent to a model and no quota is used. It takes a couple of seconds. PaceMeter then deletes the session transcript that run created and fetches usage again. This only happens when you click Refresh. The automatic 5-minute refresh never launches Claude Code.
+
+PaceMeter never uses the refresh token itself. Each refresh issues a new refresh token and invalidates the old one, so doing it outside Claude Code would sign Claude Code out. [CodexBar](https://github.com/steipete/CodexBar) learned this the hard way and uses the same "let Claude Code do it" approach.
+
 A stale reading can miss usage from the Claude apps (chat counts toward the same limits), so treat it as a lower bound.
 
 ## Caveat
@@ -81,6 +85,7 @@ src/PaceMeter/
   TrayIconRenderer.cs   draws the two-bar tray icon
   UsageClient.cs        reads credentials, calls the usage endpoint, parses limits
   SnapshotStore.cs      saves/loads the last good reading for stale display
+  ClaudeCodeRefresher.cs  on Refresh, has Claude Code renew an expired token
   TimeFormat.cs         "3:48 AM" / "Sat 3:48 AM" formatting
   Pace.cs               pace/projection math
   Theme.cs              colors

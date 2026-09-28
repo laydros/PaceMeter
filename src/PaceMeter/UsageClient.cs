@@ -75,6 +75,21 @@ internal sealed class UsageClient : IDisposable
         }
     }
 
+    /// <summary>The access token's expiry from the credentials file, or null if it can't be read.</summary>
+    public static DateTimeOffset? ReadTokenExpiry()
+    {
+        try
+        {
+            using var stream = new FileStream(CredentialsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var ms = JsonSerializer.Deserialize<CredentialsFile>(stream)?.ClaudeAiOauth?.ExpiresAt;
+            return ms is long v ? DateTimeOffset.FromUnixTimeMilliseconds(v) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
     static async Task<string> ReadTokenAsync(CancellationToken ct)
     {
         var path = CredentialsPath;

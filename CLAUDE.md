@@ -27,6 +27,10 @@ pwsh -NoProfile -File tools/Build-Release.ps1        # test + publish + installe
 
 - `UsageClient` reads the OAuth token from Claude Code's `.credentials.json` (honors `CLAUDE_CONFIG_DIR`) on every fetch and calls `GET https://api.anthropic.com/api/oauth/usage` with header `anthropic-beta: oauth-2025-04-20`. It only uses the response's `limits` array; `group` maps to window length (`session` = 5h, `weekly` = 7d).
 - The token is read-only here. Never refresh or rewrite it: Claude Code owns the refresh token, and rotating it would sign Claude Code out.
+- `ClaudeCodeRefresher` renews an expired token by running `claude … /usage`, a local slash command that sends no model prompt, with tools, MCP and Remote Control disabled. Claude Code then refreshes its own token.
+  - Success means `expiresAt` in `.credentials.json` changed.
+  - Each run uses a fresh `--session-id`, because reusing one fails with "already in use". Afterwards it deletes exactly `projects/**/<that id>.jsonl`.
+  - It must only run from an explicit Refresh (`RefreshAsync(userInitiated: true)`), never from the timer or from opening the popup. Background launches of `claude` were a major complaint in CodexBar.
 - The access token lasts about 8 hours, so it expiring overnight is normal. `UsageException.TokenExpired` marks that case, and the UI shows it as a calm amber notice, not an error.
 - `SnapshotStore` saves each successful reading to `%LOCALAPPDATA%\PaceMeter\last-usage.json`, and `TrayContext` loads it at startup. When a fetch fails, the saved reading is shown as stale: gray tray meters, a "Last updated" footer, and "Reset" for any window whose `ResetsAt` has passed.
 - `Pace.Compute` is pure and unit-tested. Keep the UI free of math so it stays testable.

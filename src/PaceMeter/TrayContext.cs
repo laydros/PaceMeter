@@ -31,7 +31,7 @@ internal sealed class TrayContext : ApplicationContext
         };
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Refresh", null, async (_, _) => await RefreshAsync());
+        menu.Items.Add("Refresh", null, async (_, _) => await RefreshAsync(userInitiated: true));
         menu.Items.Add(_startupItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
@@ -44,7 +44,7 @@ internal sealed class TrayContext : ApplicationContext
         };
         _tray.MouseClick += OnTrayClick;
 
-        _popup.RefreshRequested += async (_, _) => await RefreshAsync();
+        _popup.RefreshRequested += async (_, _) => await RefreshAsync(userInitiated: true);
         _popup.QuitRequested += (_, _) => ExitThread();
 
         // Show the last saved reading until the first fetch completes (or instead of it, if that fails).
@@ -52,10 +52,10 @@ internal sealed class TrayContext : ApplicationContext
         UpdateIcon();
 
         _timer.Interval = (int)RefreshInterval.TotalMilliseconds;
-        _timer.Tick += async (_, _) => await RefreshAsync();
+        _timer.Tick += async (_, _) => await RefreshAsync(userInitiated: false);
         _timer.Start();
 
-        _ = RefreshAsync();
+        _ = RefreshAsync(userInitiated: false);
     }
 
     async void OnTrayClick(object? sender, MouseEventArgs e)
@@ -70,10 +70,14 @@ internal sealed class TrayContext : ApplicationContext
         _popup.ShowNearCursor();
 
         if (_snapshot is null || DateTimeOffset.Now - _snapshot.FetchedAt > StaleAfter)
-            await RefreshAsync();
+            await RefreshAsync(userInitiated: false);
     }
 
-    async Task RefreshAsync()
+    /// <param name="userInitiated">
+    /// True only for an explicit Refresh click. Only then may an expired token be renewed by launching
+    /// Claude Code; background refreshes never start other programs.
+    /// </param>
+    async Task RefreshAsync(bool userInitiated)
     {
         if (_loading) return;
         _loading = true;
@@ -81,7 +85,7 @@ internal sealed class TrayContext : ApplicationContext
 
         try
         {
-            _snapshot = await _client.FetchAsync();
+            _snapshot = await FetchAsync(userInitiated);
             _error = null;
             _store.Save(_snapshot);
         }
@@ -101,6 +105,33 @@ internal sealed class TrayContext : ApplicationContext
         _popup.SetState(_snapshot, _error, _loading);
         UpdateIcon();
     }
+
+    async Task<UsageSnapshot> FetchAsync(bool userInitiated)
+    {
+        try
+        {
+            return await _client.FetchAsync();
+        }
+        catch (UsageException ex) when (userInitiated && ex.TokenExpired)
+        {
+            _popup.SetState(_snapshot, _error, _loading, "Renewing sign-in...");
+            var outcome = await ClaudeCodeRefresher.RefreshAsync();
+            _popup.SetState(_snapshot, _error, _loading);
+            if (outcome != RefreshOutcome.Refreshed)
+                throw new UsageException(RenewFailedMessage(outcome));
+            return await _client.FetchAsync();
+        }
+    }
+
+    static string RenewFailedMessage(RefreshOutcome outcome) => outcome switch
+    {
+        RefreshOutcome.ClaudeNotFound =>
+            "Couldn't find Claude Code (the claude command) to renew the sign-in. Open Claude Code to renew it.",
+        RefreshOutcome.TimedOut =>
+            "Claude Code didn't respond within 20 seconds. Run claude in a terminal to renew the sign-in.",
+        _ =>
+            "Claude Code didn't renew its sign-in. Run claude in a terminal; you may need to sign in again.",
+    };
 
     void UpdateIcon()
     {

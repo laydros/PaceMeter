@@ -22,6 +22,7 @@ internal sealed class PopupForm : Form
     UsageSnapshot? _snapshot;
     UsageException? _error;
     bool _loading;
+    string? _loadingText;
     Rectangle _refreshLink, _quitLink;
 
     public event EventHandler? RefreshRequested;
@@ -57,8 +58,10 @@ internal sealed class PopupForm : Form
     float Scale1 => DeviceDpi / 96f;
     int S(int v) => (int)Math.Round(v * Scale1);
 
-    public void SetState(UsageSnapshot? snapshot, UsageException? error, bool loading)
+    /// <param name="loadingText">Footer text while loading, when something more specific than "Refreshing..." is happening.</param>
+    public void SetState(UsageSnapshot? snapshot, UsageException? error, bool loading, string? loadingText = null)
     {
+        _loadingText = loadingText;
         _snapshot = snapshot;
         _error = error;
         _loading = loading;
@@ -133,10 +136,8 @@ internal sealed class PopupForm : Form
             if (!_error.TokenExpired) return _error.Message;
 
             var when = _error.ExpiredAt is { } at ? $" at {TimeFormat.When(at, DateTimeOffset.Now)}" : "";
-            var resume = _snapshot is null
-                ? "Updates resume the next time you use Claude Code."
-                : "Showing the last reading; updates resume the next time you use Claude Code.";
-            return $"Claude Code's sign-in token expired{when}. {resume}";
+            var showing = _snapshot is null ? "" : ", so this is the last saved reading";
+            return $"Claude Code's sign-in token expired{when}{showing}. Click Refresh to have Claude Code renew it.";
         }
     }
 
@@ -267,7 +268,7 @@ internal sealed class PopupForm : Form
     {
         y += S(4);
         var stale = _error is not null && _snapshot is not null;
-        var status = _loading ? "Refreshing..."
+        var status = _loading ? _loadingText ?? "Refreshing..."
             : _snapshot is { } s ? $"{(stale ? "Last updated" : "Updated")} {TimeFormat.When(s.FetchedAt, DateTimeOffset.Now)}"
             : "";
         TextRenderer.DrawText(g, status, _textFont, new Point(left, y), stale && !_loading ? Theme.Warn : Theme.TextMuted);
